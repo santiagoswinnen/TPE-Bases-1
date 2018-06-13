@@ -48,7 +48,8 @@ BEGIN
                          OR fechaHoraRetiro IS NULL
                          OR origenEstacion IS NULL
                          OR detinoEstacion IS NULL
-                         OR tiempoUso IS NULL;
+                         OR tiempoUso IS NULL
+                         OR tiempoUso < 0;
   --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
   --hacer un cursor para chequear los solapamientos
 END
