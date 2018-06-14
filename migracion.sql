@@ -14,9 +14,11 @@ CREATE TABLE bici (
   nombreOrigen TEXT,
   detinoEstacion INTEGER NOT NULL,
   nombreDestino TEXT,
-  tiempoUso TEXT,
+  tiempoUso TEXT, --convertir de str a interval reemplazando h,m,s por : :
   fechaCreacion TIMESTAMP
 );
+
+\copy bici from test1.csv header delimiter ';' csv;
 
 -- Tabla final
 CREATE TABLE recorrido_final (
@@ -29,6 +31,23 @@ CREATE TABLE recorrido_final (
 ,
 PRIMARY KEY(usuario,fecha_hora_ret));
 
+/*probablemente no termine siendo create table pero la logica sirve para
+seleccionar tuplas q tengan pks repetidas*/
+CREATE TABLE pkRepeated AS (
+  SELECT *
+  FROM bici b1
+  WHERE b1.id_usuario IN (
+    SELECT id
+    FROM bici b2
+    GROUP BY b2.usuario, b2.fechaHoraRetiro
+    HAVING count(usuario) > 1)
+  ORDER BY b1.usuario ASC);
+
+/*probablemente no se use mas tarde*/
+DELETE FROM bici WHERE EXISTS(
+    SELECT * FROM pkRepeated
+    WHERE bici.usuario == pkRepeated.usuario
+      AND bici.fechaHoraRetiro == pkRepeated.fechaHoraRetiro);
 
 CREATE OR REPLACE FUNCTION migracion()
 RETURNS void
@@ -40,6 +59,10 @@ BEGIN
                          OR origenEstacion IS NULL
                          OR detinoEstacion IS NULL
                          OR tiempoUso IS NULL;
+  UPDATE bici
+  SET tiempoUso = REPLACE(REPLACE(REPLACE(tiempoUso, 'SEG', 's'), 'MIN', 'm'), 'H', 'h');
+  --mandar a tabla final
+
   --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
   --hacer un cursor para chequear los solapamientos
 END
@@ -48,4 +71,3 @@ $$ LANGUAGE plpgSQL;
 SELECT migracion();
 
 SELECT * FROM bici;
-
