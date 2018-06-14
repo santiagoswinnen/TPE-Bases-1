@@ -3,28 +3,19 @@ DROP TABLE  bici;
 -- Antes tienen que haber copiado el archivo a su cuenta de pampero
 
 --Primera tabla datos crudos del csv
+
+SET datestyle to DMY;
+
 CREATE TABLE bici (
   periodo TEXT,
-  idUsuario TEXT ,
-  fechaHoraRetiro TEXT,
-  origenEstacion TEXT,
+  idUsuario INTEGER,
+  fechaHoraRetiro TIMESTAMP,
+  origenEstacion INTEGER NOT NULL,
   nombreOrigen TEXT,
-  detinoEstacion TEXT,
+  detinoEstacion INTEGER NOT NULL,
   nombreDestino TEXT,
   tiempoUso TEXT,
-  fechaCreacion TEXT
-);
-
---Segunda tabla, se eliminan los que no cumplen la restriccion
-CREATE TABLE bici_con_formato (
-  periodo TEXT,
-  usuario INTEGER ,
-  fechaHoraRetiro TIMESTAMP NOT NULL,
-  origenEstacion INTEGER NOT NULL ,
-  detinoEstacion INTEGER NOT NULL ,
-  nombreDestino TEXT,
-  tiempoUso TIMESTAMP NOT NULL,
-  fechaCreacion TEXT
+  fechaCreacion TIMESTAMP
 );
 
 -- Tabla final
@@ -48,8 +39,7 @@ BEGIN
                          OR fechaHoraRetiro IS NULL
                          OR origenEstacion IS NULL
                          OR detinoEstacion IS NULL
-                         OR tiempoUso IS NULL
-                         OR tiempoUso < 0;
+                         OR tiempoUso IS NULL;
   --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
   --hacer un cursor para chequear los solapamientos
 END
