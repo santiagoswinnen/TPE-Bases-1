@@ -110,7 +110,7 @@ AS $$
 
 BEGIN
   DELETE FROM bici WHERE usuario IS NULL
-                         OR fecha_hora_retiro IS NULL
+                         OR fecha_hora_ret IS NULL
                          OR est_origen IS NULL
                          OR est_destino IS NULL
                          OR tiempo_uso IS NULL
@@ -124,10 +124,10 @@ BEGIN
   INSERT INTO sin_repeticiones_pk(
     SELECT *
     FROM sin_null s1
-    WHERE (s1.usuario, s1.fecha_hora_retiro) IN (
-      SELECT s2.usuario, s2.fecha_hora_retiro
+    WHERE (s1.usuario, s1.fecha_hora_ret) IN (
+      SELECT s2.usuario, s2.fecha_hora_ret
       FROM sin_null s2
-      GROUP BY s2.usuario, s2.fecha_hora_retiro
+      GROUP BY s2.usuario, s2.fecha_hora_ret
       HAVING count(s2.usuario) = 1)
     ORDER BY s1.tiempo_uso ASC
   );
