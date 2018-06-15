@@ -51,19 +51,19 @@ AS $$
 DECLARE
   segundo sin_null;
   temp sin_null;
-  myCursor CURSOR FOR
+  myCursor1 CURSOR FOR
   SELECT * FROM sin_null
   WHERE usuario = usr and fecha_hora_ret = fch
   ORDER BY tiempo_uso ASC;
 
 BEGIN
 
-  OPEN myCursor;
+  OPEN myCursor1;
 
-  FETCH myCursor INTO temp;
-  FETCH myCursor INTO segundo;
+  FETCH myCursor1 INTO temp;
+  FETCH myCursor1 INTO segundo;
 
-  CLOSE myCursor;
+  CLOSE myCursor1;
 
   INSERT INTO sin_repeticiones_pk
     VALUES(segundo.periodo, segundo.usuario, segundo.fecha_hora_ret,
@@ -118,7 +118,9 @@ BEGIN
   UPDATE bici
   SET tiempo_uso = REPLACE(REPLACE(REPLACE(tiempo_uso, 'SEG', 's'), 'MIN', 'm'), 'H', 'h');
   INSERT INTO sin_null(
-    SELECT periodo, usuario, fecha_hora_ret, est_origen, est_destino, tiempo_uso
+    SELECT periodo, usuario, fecha_hora_ret, est_origen, 
+    est_destino, CAST(tiempo_uso AS INTERVAL)
+    FROM bici
   );
 
   INSERT INTO sin_repeticiones_pk(
