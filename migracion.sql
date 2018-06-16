@@ -1,11 +1,6 @@
-DROP TABLE  bici;
--- Antes tienen que haber copiado el archivo a su cuenta de pampero
-
---Primera tabla datos crudos del csv
-
 SET datestyle to DMY;
 
--- tabla que se llenara con datos del csv al comienzo
+--Primera tabla datos crudos del csv
 CREATE TABLE bici (
   periodo TEXT,
   usuario INTEGER,
@@ -34,7 +29,14 @@ CREATE TABLE sin_null (
 -- tabla temp donde se filtraran las repeticiones de pk segun pedido
 SELECT * INTO sin_repeticiones_pk FROM sin_null;
 
-SELECT * INTO finalllll FROM sin_repeticiones_pk;
+CREATE TABLE con_fecha_dev(
+  periodo TEXT,
+  usuario INTEGER,
+  fecha_hora_ret TIMESTAMP NOT NULL,
+  est_origen INTEGER NOT NULL,
+  est_destino INTEGER NOT NULL,
+  fecha_hora_dev TIMESTAMP NOT NULL CHECK(fecha_hora_dev >= fecha_hora_ret)
+);
 
 -- Tabla final
 CREATE TABLE recorrido_final (
@@ -101,8 +103,6 @@ BEGIN
 
     END LOOP;
     CLOSE myCursor;
-
-    RAISE NOTICE '%', usr;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -138,14 +138,118 @@ BEGIN
 
   PERFORM borra_pk_repetidas();
 
-  INSERT INTO finalllll(
-    SELECT * FROM sin_repeticiones_pk);
+  INSERT INTO con_fecha_dev(
+    SELECT periodo, usuario, fecha_hora_ret, est_origen, est_destino,
+    fecha_hora_ret + tiempo_uso
+    FROM sin_repeticiones_pk
+    ORDER BY fecha_hora_ret ASC
+  );
 
+  INSERT INTO recorrido_final(
+    SELECT *
+    FROM con_fecha_dev
+    WHERE usuario IN (
+      SELECT usuario
+      FROM con_fecha_dev
+      GROUP BY usuario
+      HAVING count(usuario) = 1
+    )
+  );
+
+  PERFORM itera_por_ids();
+
+  --PERFORM limpia_temp();
   --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
   --hacer un cursor para chequear los solapamientos
 END
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION limpia_temp()
+RETURNS VOID
+AS $$
+
+BEGIN
+  DROP TABLE bici;
+  DROP TABLE sin_null;
+  DROP TABLE sin_repeticiones_pk;
+  DROP TABLE con_fecha_dev;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION filtra_solapados(usr con_fecha_dev.usuario%TYPE)
+RETURNS VOID
+AS $$
+DECLARE
+  t1 con_fecha_dev;
+  periodo TEXT;
+  fch_i TIMESTAMP;
+  est_i INTEGER;
+  est_f INTEGER;
+  fch_f TIMESTAMP;
+
+  myCursorOverlaps CURSOR FOR
+  SELECT *
+  FROM con_fecha_dev
+  WHERE usuario = usr
+  ORDER BY fecha_hora_ret ASC;
+
+BEGIN
+
+    OPEN myCursorOverlaps;
+    FETCH myCursorOverlaps INTO t1;
+
+    LOOP
+
+      EXIT WHEN t1 ISNULL;
+
+      fch_i = t1.fecha_hora_ret;
+      fch_f = t1.fecha_hora_dev;
+      periodo = t1.periodo;
+      est_i = t1.est_origen;
+      est_f = t1.est_destino;
+
+      LOOP
+
+        FETCH myCursorOverlaps INTO t1;
+        EXIT WHEN NOT FOUND OR t1.fecha_hora_ret > fch_f;
+
+        fch_f = t1.fecha_hora_dev;
+        est_f = t1.est_destino;
+
+      END LOOP;
+
+      INSERT INTO recorrido_final VALUES(periodo, usr, fch_i, est_i, est_f, fch_f);
+
+    END LOOP;
+
+    CLOSE myCursorOverlaps;
+END;
+$$ LANGUAGE plpgSQL;
+
+CREATE OR REPLACE FUNCTION itera_por_ids()
+RETURNS VOID
+AS $$
+DECLARE
+    usr con_fecha_dev.usuario%TYPE;
+    usuarioCursor CURSOR FOR
+    SELECT DISTINCT usuario
+    FROM con_fecha_dev;
+
+BEGIN
+    OPEN usuarioCursor;
+    LOOP
+
+      FETCH usuarioCursor INTO usr;
+      EXIT WHEN NOT FOUND;
+
+      PERFORM filtra_solapados(usr);
+
+    END LOOP;
+    CLOSE usuarioCursor;
+END;
+$$ LANGUAGE plpgSQL;
+
 SELECT migracion();
 
-SELECT * FROM finalllll;
+SELECT * FROM con_fecha_dev;
