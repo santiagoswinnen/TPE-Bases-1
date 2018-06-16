@@ -13,8 +13,8 @@ CREATE TABLE bici (
   fecha_creacion TEXT
 );
 
---\copy bici from test1.csv header delimiter ';' csv;
-\copy bici from recorridos-realizados-2016.csv header delimiter ';' csv;
+\copy bici from test1.csv header delimiter ';' csv;
+--\copy bici from recorridos-realizados-2016.csv header delimiter ';' csv;
 
 -- tabla temp que filtra los null y cambia tiempo_uso a interval
 CREATE TABLE sin_null (
@@ -239,6 +239,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgSQL;
 
+SELECT migracion();
+
+SELECT * FROM recorrido_final;
 
 -- La funcion de este trigger es chequear para futuras inserciones que se cumplan las restricciones
 CREATE OR REPLACE FUNCTION trigger_func()
@@ -258,15 +261,11 @@ DECLARE
                                          OR (fecha_hora_dev = NEW.fecha_hora_dev)
                                          OR ((NEW.fecha_hora_ret = fecha_hora_ret) AND (NEW.fecha_hora_dev = fecha_hora_dev))));
 
-        IF sobreps > 0 THEN RAISE EXCEPTION 'Se ha producido un error en la inserción: ' ||
-                                            'El intervalo se solapa'; END IF;
+        IF sobreps > 0 THEN RAISE EXCEPTION 'Se ha producido un error en la inserción: El intervalo se solapa'
+                                            ; END IF;
         RETURN NEW;
 
   END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER insercion BEFORE INSERT ON recorrido_final FOR EACH ROW EXECUTE PROCEDURE trigger_func();
-
-SELECT migracion();
-
-SELECT * FROM recorrido_final;
