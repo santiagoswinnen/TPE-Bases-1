@@ -34,6 +34,8 @@ CREATE TABLE sin_null (
 -- tabla temp donde se filtraran las repeticiones de pk segun pedido
 SELECT * INTO sin_repeticiones_pk FROM sin_null;
 
+SELECT * INTO finalllll FROM sin_repeticiones_pk;
+
 -- Tabla final
 CREATE TABLE recorrido_final (
   periodo TEXT,
@@ -135,6 +137,10 @@ BEGIN
   );
 
   PERFORM borra_pk_repetidas();
+
+  INSERT INTO finalllll(
+    SELECT * FROM sin_repeticiones_pk);
+
   --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
   --hacer un cursor para chequear los solapamientos
 END
@@ -142,4 +148,4 @@ $$ LANGUAGE plpgsql;
 
 SELECT migracion();
 
-SELECT * FROM bici;
+SELECT * FROM finalllll;
