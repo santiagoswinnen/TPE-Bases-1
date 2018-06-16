@@ -3,23 +3,24 @@ SET datestyle to DMY;
 --Primera tabla datos crudos del csv
 CREATE TABLE bici (
   periodo TEXT,
-  usuario INTEGER,
-  fecha_hora_ret TIMESTAMP,
-  est_origen INTEGER NOT NULL,
+  usuario TEXT,
+  fecha_hora_ret TEXT,
+  est_origen TEXT,
   nombre_origen TEXT,
-  est_destino INTEGER NOT NULL,
+  est_destino TEXT,
   nombre_destino TEXT,
   tiempo_uso TEXT,
-  fecha_creacion TIMESTAMP
+  fecha_creacion TEXT
 );
 
-\copy bici from test1.csv header delimiter ';' csv;
+--\copy bici from test1.csv header delimiter ';' csv;
+\copy bici from recorridos-realizados-2016.csv header delimiter ';' csv;
 
 -- tabla temp que filtra los null y cambia tiempo_uso a interval
 CREATE TABLE sin_null (
   periodo TEXT,
   usuario INTEGER,
-  fecha_hora_ret TIMESTAMP NOT NULL,
+  fecha_hora_ret TIMESTAMP NOT NULL CHECK (fecha_hora_ret > '1900-01-01'),
   est_origen INTEGER NOT NULL,
   est_destino INTEGER NOT NULL,
   tiempo_uso INTERVAL NOT NULL
@@ -120,9 +121,10 @@ BEGIN
   UPDATE bici
   SET tiempo_uso = REPLACE(REPLACE(REPLACE(tiempo_uso, 'SEG', 's'), 'MIN', 'm'), 'H', 'h');
   INSERT INTO sin_null(
-    SELECT periodo, usuario, fecha_hora_ret, est_origen, 
-    est_destino, CAST(tiempo_uso AS INTERVAL)
+    SELECT periodo, usuario::INTEGER, fecha_hora_ret::TIMESTAMP,
+    est_origen::INTEGER, est_destino::INTEGER, tiempo_uso::INTERVAL
     FROM bici
+    WHERE tiempo_uso SIMILAR TO '[0-9]*h [0-9]*m [0-9]*s'
   );
 
   INSERT INTO sin_repeticiones_pk(
@@ -145,22 +147,9 @@ BEGIN
     ORDER BY fecha_hora_ret ASC
   );
 
-  INSERT INTO recorrido_final(
-    SELECT *
-    FROM con_fecha_dev
-    WHERE usuario IN (
-      SELECT usuario
-      FROM con_fecha_dev
-      GROUP BY usuario
-      HAVING count(usuario) = 1
-    )
-  );
-
   PERFORM itera_por_ids();
 
-  --PERFORM limpia_temp();
-  --hacer un cursor para seleccionar las cosas con id igual e insertar solo el segundo
-  --hacer un cursor para chequear los solapamientos
+  PERFORM limpia_temp();
 END
 $$ LANGUAGE plpgsql;
 
@@ -250,6 +239,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgSQL;
 
+
+-- La funcion de este trigger es chequear para futuras inserciones que se cumplan las restricciones
+CREATE OR REPLACE FUNCTION trigger_func()
+RETURNS TRIGGER
+AS $$
+DECLARE
+  sobreps INTEGER;
+  BEGIN
+        sobreps = (SELECT COUNT(*)
+        FROM recorrido_final
+        WHERE NEW.usuario = usuario AND (((NEW.fecha_hora_dev = fecha_hora_ret) OR (fecha_hora_dev = NEW.fecha_hora_ret))
+                                         OR ((NEW.fecha_hora_dev > fecha_hora_ret AND NEW.fecha_hora_ret < fecha_hora_ret)
+                                             OR (fecha_hora_dev > NEW.fecha_hora_ret AND fecha_hora_ret < NEW.fecha_hora_ret))
+                                         OR (NEW.fecha_hora_ret = fecha_hora_ret)
+                                         OR ((NEW.fecha_hora_ret > fecha_hora_ret AND NEW.fecha_hora_dev < fecha_hora_dev)
+                                             OR (fecha_hora_ret>NEW.fecha_hora_ret AND fecha_hora_dev < NEW.fecha_hora_dev))
+                                         OR (fecha_hora_dev = NEW.fecha_hora_dev)
+                                         OR ((NEW.fecha_hora_ret = fecha_hora_ret) AND (NEW.fecha_hora_dev = fecha_hora_dev))));
+
+        IF sobreps > 0 THEN RAISE EXCEPTION 'Se ha producido un error en la inserción: ' ||
+                                            'El intervalo se solapa'; END IF;
+        RETURN NEW;
+
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER insercion BEFORE INSERT ON recorrido_final FOR EACH ROW EXECUTE PROCEDURE trigger_func();
+
 SELECT migracion();
 
-SELECT * FROM con_fecha_dev;
+SELECT * FROM recorrido_final;
